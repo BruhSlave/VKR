@@ -1,0 +1,17 @@
+# Terraform files
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl
+
+# Локальные конфиги и логи
+crash.log
+*.log
+.terraformrc
+terraform.rc
+
+# Файлы редакторов/IDE
+.idea/
+.vscode/
+*.swp
