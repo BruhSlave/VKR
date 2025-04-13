@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+
+    environment {
+        // Автоматически подтягиваем credentials из Jenkins
+        YC_TOKEN      = credentials('YC_TOKEN')
+        YC_CLOUD_ID   = credentials('YC_CLOUD_ID')
+        YC_FOLDER_ID  = credentials('YC_FOLDER_ID')
+        TF_CLI_CONFIG_FILE = "${WORKSPACE}/.terraformrc"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'stage',
+                    url: 'git@github.com:BruhSlave/VKR.git'
+            }
+        }
+
+stage('Setup Terraform') {
+    steps {
+        // Создаем terraform.rc для зеркала Yandex
+        
+        //sh '''
+          // mkdir ${HOME}/.terraform.d/plugins
+          // '''
+           
+        sh '''#!/bin/bash
+            cat > .terraformrc <<'EOF'
+            provider_installation {
+                network_mirror {
+                    url = "https://terraform-mirror.yandexcloud.net/"
+                    include = ["registry.terraform.io/*/*"]
+                }
+            filesystem_mirror {
+                path = "/var/lib/jenkins/.terraform.d/plugins"
+                }
+            }
+        EOF
+        '''
+    }
+}
+
+        stage('Terraform Init') {
+            steps {
+                sh '''
+                    terraform init -input=false -no-color
+                '''
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                sh '''
+                    terraform plan -out=tfplan -no-color
+                '''
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                sh '''
+                    terraform apply -auto-approve -no-color tfplan
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs() // Очищаем workspace после выполнения
+        }
+    }
+}
