@@ -1,3 +1,14 @@
+variable "vm_count_per_zone" {
+  description = "Number of VMs per availability zone"
+  type        = number
+  default     = 1
+}
+
+variable "ssh_public_key" {
+  description = "SSH public key for instance access"
+  type        = string
+}
+
 variable "name_prefix" {
   description = "(Optional) - Name prefix for project."
   type        = string
@@ -18,12 +29,6 @@ variable "linux_vm_name" {
 
 variable "vpc_network_name" {
   description = "(Optional) - Name of the VPC network."
-  type        = string
-  default     = null
-}
-
-variable "ydb_serverless_name" {
-  description = "(Optional) - Name of the YDB serverless."
   type        = string
   default     = null
 }
@@ -87,20 +92,4 @@ variable "image_id" {
   description = "(Optional) - Boot disk image id. If not provided, it defaults to Ubuntu 22.04 LTS image id"
   type        = string
   default     = "fd833v6c5tb0udvk4jo6"
-}
-
-variable "secondary_disks" {
-  description = "(Optional) - Configuration for secondary disks."
-  type = object({
-    count = number
-    name  = string
-    type  = string
-    size  = number
-  })
-  default = {
-    count = 2
-    name  = "secondary-disk"
-    type  = "network-hdd"
-    size  = 15
-  }
 }
