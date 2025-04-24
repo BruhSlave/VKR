@@ -1,3 +1,13 @@
+variable "secret_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "access_key" {
+  type      = string
+  sensitive = true
+}
+
 variable "vm_count_per_zone" {
   description = "Number of VMs per availability zone"
   type        = number
