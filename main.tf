@@ -86,34 +86,34 @@ resource "yandex_vpc_address" "this" {
 }
 
 # Создание сервисного аккаунта 
-# resource "yandex_iam_service_account" "bucket" {
-#   name = local.bucket_sa_name
-# }
+resource "yandex_iam_service_account" "bucket" {
+  name = local.bucket_sa_name
+}
 
 # Назначение роли сервисному аккаунту
-# resource "yandex_resourcemanager_folder_iam_member" "storage_editor" {
-#   folder_id = var.folder_id
-#   role      = "storage.editor"
-#   member    = "serviceAccount:${yandex_iam_service_account.bucket.id}"
-# }
+resource "yandex_resourcemanager_folder_iam_member" "storage_editor" {
+  folder_id = var.folder_id
+  role      = "storage.editor"
+  member    = "serviceAccount:${yandex_iam_service_account.bucket.id}"
+}
 
 # Создание статического ключа доступа
-# resource "yandex_iam_service_account_static_access_key" "this" {
-#   service_account_id = yandex_iam_service_account.bucket.id
-#   description        = "static access key for object storage"
-# }
+resource "yandex_iam_service_account_static_access_key" "this" {
+  service_account_id = yandex_iam_service_account.bucket.id
+  description        = "static access key for object storage"
+}
 
 # Создание бакета 
-# resource "yandex_storage_bucket" "this" {
-#   bucket     = local.bucket_name
-#   access_key = yandex_iam_service_account_static_access_key.this.access_key
-#   secret_key = yandex_iam_service_account_static_access_key.this.secret_key
+resource "yandex_storage_bucket" "this" {
+  bucket     = local.bucket_name
+  access_key = yandex_iam_service_account_static_access_key.this.access_key
+  secret_key = yandex_iam_service_account_static_access_key.this.secret_key
 
-#   depends_on = [yandex_resourcemanager_folder_iam_member.storage_editor]
-# }
+  depends_on = [yandex_resourcemanager_folder_iam_member.storage_editor]
+}
 
-# resource "random_string" "bucket_name" {
-#   length  = 8
-#   special = false
-#   upper   = false
-# }
+resource "random_string" "bucket_name" {
+  length  = 8
+  special = false
+  upper   = false
+}
