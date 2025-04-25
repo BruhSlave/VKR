@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'CONFIRM_DESTROY', choices: ['NO', 'YES'], description: 'Are you sure you want to destroy the infrastructure?')
+    }
+
+    environment {
+        YC_CLOUD_ID         = credentials('YC_CLOUD_ID')
+        YC_FOLDER_ID        = credentials('YC_FOLDER_ID')
+        SA_KEY_FILE         = credentials('yc-sa-key')
+        TF_VAR_access_key   = credentials('access_key')
+        TF_VAR_secret_key   = credentials('secret_key')
+        SHARED_DIR          = "/var/lib/jenkins/shared-terraform"
+    }
+
+    stages {
+        stage('Check Confirmation') {
+            when {
+                expression { params.CONFIRM_DESTROY != 'YES' }
+            }
+            steps {
+                error "Destroy aborted: you must confirm by selecting 'YES'."
+            }
+        }
+
+        stage('Setup YC Token') {
+            steps {
+                sh """
+                    yc config set service-account-key ${SA_KEY_FILE}
+                    yc config set cloud-id ${YC_CLOUD_ID}
+                    yc config set folder-id ${YC_FOLDER_ID}
+                    yc config profile activate default
+                    yc iam create-token > yc_token.txt
+                """
+                script {
+                    env.YC_TOKEN = readFile("${WORKSPACE}/yc_token.txt").trim()
+                }
+            }
+        }
+        stage('Setup Terraform') {
+            steps {
+                sh '''#!/bin/bash
+                    cat > .terraformrc <<'EOF'
+provider_installation {
+  network_mirror {
+    url = "https://terraform-mirror.yandexcloud.net/"
+    include = ["registry.terraform.io/*/*"]
+  }
+  filesystem_mirror {
+    path = "/var/lib/jenkins/.terraform.d/plugins"
+  }
+}
+EOF
+                '''
+            }
+        }
+        stage('Terraform Destroy') {
+            steps {
+                sh '''
+                    export YC_TOKEN=${YC_TOKEN}
+                    cd ${SHARED_DIR}
+                    terraform destroy -auto-approve -no-color
+                '''
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                sh 'rm -f yc_token.txt || true'
+            }
+        }
+    }
+}
