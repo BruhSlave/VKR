@@ -1,0 +1,82 @@
+pipeline {
+    agent any
+
+    environment {
+        YC_CLOUD_ID         = credentials('YC_CLOUD_ID')       
+        YC_FOLDER_ID        = credentials('YC_FOLDER_ID')      
+        SA_KEY_FILE         = credentials('yc-sa-key')         
+        TF_CLI_CONFIG_FILE  = "${WORKSPACE}/.terraformrc"
+        TF_VAR_access_key   = credentials('access_key')
+        TF_VAR_secret_key   = credentials('secret_key')
+        SHARED_DIR          = "/var/lib/jenkins/shared-terraform"
+    }
+
+    stages {
+        stage('Setup Token') {
+            steps {
+                sh """
+                    yc config set service-account-key ${SA_KEY_FILE}
+                    yc config set cloud-id ${YC_CLOUD_ID}
+                    yc config set folder-id ${YC_FOLDER_ID}
+                    yc config profile activate default
+                    yc iam create-token > yc_token.txt
+                """
+                script {
+                    env.YC_TOKEN = readFile('yc_token.txt').trim()
+                }
+            }
+        }
+
+        stage('Setup Terraform') {
+            steps {
+                sh '''#!/bin/bash
+                    cat > .terraformrc <<'EOF'
+                    provider_installation {
+                        network_mirror {
+                            url = "https://terraform-mirror.yandexcloud.net/"
+                            include = ["registry.terraform.io/*/*"]
+                            }
+                        filesystem_mirror {
+                        path = "/var/lib/jenkins/.terraform.d/plugins"
+                        }
+                    }
+                EOF
+                '''
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                sh '''
+                    cd ${SHARED_DIR}
+                    export YC_TOKEN=${YC_TOKEN}
+                    terraform init \
+                      -reconfigure \
+                      -backend-config="bucket=vkr-terraform-state" \
+                      -backend-config="key=prod.tfstate" \
+                      -backend-config="endpoint=https://storage.yandexcloud.net" \
+                      -backend-config="access_key=${TF_VAR_access_key}" \
+                      -backend-config="secret_key=${TF_VAR_secret_key}" \
+                      -input=false -no-color
+                '''
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                sh '''
+                    cd ${SHARED_DIR}
+                    export YC_TOKEN=${YC_TOKEN}
+                    terraform apply -auto-approve -no-color tfplan
+                '''
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                sh 'rm -f yc_token.txt || true'
+                cleanWs()
+            }
+        }
+    }
+}
