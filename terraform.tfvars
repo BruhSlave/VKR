@@ -2,7 +2,7 @@ folder_id   = "b1gsqp3omlusv377dipl"
 name_prefix = "project-brasl"
 
 instance_resources = {
-  cores  = 2
+  cores  = 4
   memory = 4
 }
 
