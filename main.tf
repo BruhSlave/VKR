@@ -54,6 +54,7 @@ resource "yandex_compute_instance" "this" {
   network_interface {
     subnet_id = yandex_vpc_subnet.private[each.value.zone].id
     nat       = each.value.index == 0 ? true : false
+    nat_ip_address = each.value.index == 0 ? yandex_vpc_address.this[each.value.zone].external_ipv4_address[0].address : null
   }
 
   # Создание дисков до ВМ
