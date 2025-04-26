@@ -19,11 +19,6 @@ variable "ssh_public_key" {
   type        = string
 }
 
-variable "user" {
-  description = "VM's user"
-  type = string
-}
-
 variable "name_prefix" {
   description = "(Optional) - Name prefix for project."
   type        = string
