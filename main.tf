@@ -49,6 +49,7 @@ resource "yandex_compute_instance" "this" {
 
   metadata = {
     ssh-keys = "ubuntu:${var.ssh_public_key}"
+    user = "ubuntu"
   }
 
   network_interface {
