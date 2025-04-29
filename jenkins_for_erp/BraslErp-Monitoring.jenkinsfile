@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    environment {
+        SCRIPT_DIR = "/var/lib/jenkins/scripts"
+        SHARED_DIR = "/var/lib/jenkins/shared-terraform"
+        ANSIBLE_DIR = "/var/lib/jenkins/ansible"
+        SSH_CREDENTIALS_ID = 'ssh-key-ubuntu'
+        SSH_USER = 'ubuntu'
+    }
+
+    stages {
+        stage('Load Terraform Outputs') {
+            steps {
+                sh '''
+                    cd ${SHARED_DIR}
+                    terraform output -json > terraform-outputs.json
+                '''
+            }
+        }
+        
+        stage('Wait stage') {
+            steps {
+                sh '''
+                    sleep 10
+                '''
+            }
+        }
+        
+        stage('Update Ansible Inventory') {
+            steps {
+                sh '/var/lib/jenkins/scripts/generate_inventory.sh'
+            }
+        }
+
+        stage('Install Node_Exporter') {
+            steps {
+                sshagent(credentials: ["${SSH_CREDENTIALS_ID}"]) {
+                    sh '''
+                        export ANSIBLE_CONFIG=/var/lib/jenkins/ansible/ansible.cfg
+                        ansible-playbook -i ${ANSIBLE_DIR}/inventory ${ANSIBLE_DIR}/install_node_exporter.yml
+                    '''
+                }
+            }
+        }
+
+       stage('Update Prometheus Targets') {
+            steps {
+                sh '/var/lib/jenkins/scripts/generate_instances.sh'
+            }
+        }
+
+        stage('Reload Prometheus') {
+            steps {
+                sh '''
+                    curl -X POST http://localhost:9090/-/reload
+                '''
+            }
+        }
+    }
+}
+
