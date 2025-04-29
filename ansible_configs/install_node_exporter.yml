@@ -1,0 +1,47 @@
+- hosts: nodes
+  become: true
+  tasks:
+    - name: Install dependencies
+      apt:
+        name:
+          - wget
+          - tar
+        state: present
+        update_cache: true
+
+    - name: Download Node Exporter
+      get_url:
+        url: https://github.com/prometheus/node_exporter/releases/download/v1.8.1/node_exporter-1.8.1.linux-amd64.tar.gz
+        dest: /tmp/node_exporter.tar.gz
+
+    - name: Extract Node Exporter
+      unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /opt/
+        remote_src: yes
+
+    - name: Create systemd unit file for node_exporter
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+
+          [Service]
+          User=root
+          ExecStart=/opt/node_exporter-1.8.1.linux-amd64/node_exporter
+          Restart=always
+
+          [Install]
+          WantedBy=default.target
+      notify:
+        - Restart node_exporter
+
+  handlers:
+    - name: Restart node_exporter
+      systemd:
+        name: node_exporter
+        enabled: true
+        state: restarted
+        daemon_reload: true
