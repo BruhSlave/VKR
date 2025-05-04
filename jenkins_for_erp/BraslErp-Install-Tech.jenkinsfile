@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+
+    environment {
+        SCRIPT_DIR         = "/var/lib/jenkins/scripts"
+        SHARED_DIR         = "/var/lib/jenkins/shared-terraform"
+        ANSIBLE_DIR        = "/var/lib/jenkins/ansible"
+        SSH_CREDENTIALS_ID = 'ssh-key-ubuntu'
+        SSH_USER           = 'ubuntu'
+        K8S_MASTER_IP      = credentials('master-server-ip')
+        K3S_TOKEN          = credentials('k3s-token')
+        KUBECONFIG_CRED    = credentials('kubeconfig')
+    }
+
+    stages {
+        stage('Join K3s Cluster') {
+            steps {
+                sshagent(credentials: ["${SSH_CREDENTIALS_ID}"]) {
+                    sh '''
+                        export ANSIBLE_CONFIG=${ANSIBLE_DIR}/ansible.cfg
+                        ansible-playbook -i ${ANSIBLE_DIR}/inventory ${ANSIBLE_DIR}/install_k3s_agents_and_docker.yml \
+                          --extra-vars "K8S_MASTER_IP=${K8S_MASTER_IP} K3S_TOKEN=${K3S_TOKEN}"
+                    '''
+                }
+            }
+        }
+        
+        stage('Verify K3s nodes connected') {
+            steps {
+                sshagent(credentials: ["${SSH_CREDENTIALS_ID}"]) {
+                    sh '''
+                        echo "Waiting for worker nodes to register in cluster..."
+                        export KUBECONFIG=/var/lib/jenkins/.kube/config
+                        ATTEMPTS=30
+                        while [ $ATTEMPTS -gt 0 ]; do
+                            READY=$(kubectl get nodes --no-headers | grep -vc master)
+                            if [ "$READY" -ge 3 ]; then
+                                echo "All workers connected"
+                                exit 0
+                            fi
+                            sleep 10
+                            ATTEMPTS=$((ATTEMPTS - 1))
+                        done
+                        echo "ERROR: Worker nodes did not appear in cluster"
+                        exit 1
+                    '''
+                }
+            }
+        }
+    }
+}
