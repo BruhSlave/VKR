@@ -1,0 +1,92 @@
+---
+- name: Install k3s agents and configure firewall
+  hosts: nodes
+  become: yes
+  vars:
+    k3s_url: "https://{{ lookup('env', 'K8S_MASTER_IP') }}:6443"
+    k3s_token: "{{ lookup('env', 'K3S_TOKEN') }}"
+
+  tasks:
+    - name: Disable swap
+      shell: swapoff -a || true
+
+    - name: Remove swap from fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].* swap .*)$'
+        replace: '# \1'
+
+    - name: Kill unattended-upgrades process if running
+      shell: |
+        pid=$(pgrep -f unattended-upgr) && kill -9 $pid || true
+      ignore_errors: yes
+
+    - name: Remove unattended-upgrades package
+      apt:
+        name: unattended-upgrades
+        state: absent
+        purge: yes
+        update_cache: yes
+
+    - name: Install dependencies
+      apt:
+        name:
+          - curl
+          - netfilter-persistent
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        state: present
+        filename: docker
+
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        state: present
+        update_cache: true
+
+    - name: Enable and start Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Install k3s agent
+      shell: |
+        curl -sfL https://get.k3s.io | K3S_URL={{ k3s_url }} K3S_TOKEN={{ k3s_token }} sh -
+      args:
+        creates: /etc/systemd/system/k3s-agent.service
+
+    - name: Open required ports in iptables
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ item }}"
+        jump: ACCEPT
+        state: present
+      loop:
+        - 10250
+        - 6443
+        - 8472
+        - 80
+        - 443
+
+    - name: Save iptables rules
+      shell: netfilter-persistent save
+
+    - name: Restart k3s-agent if not joined
+      systemd:
+        name: k3s-agent
+        state: restarted
+        enabled: yes
