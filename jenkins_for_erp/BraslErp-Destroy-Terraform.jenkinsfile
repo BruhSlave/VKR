@@ -12,6 +12,7 @@ pipeline {
         TF_VAR_access_key   = credentials('access_key')
         TF_VAR_secret_key   = credentials('secret_key')
         SHARED_DIR          = "/var/lib/jenkins/shared-terraform"
+        SSH_CREDENTIALS_ID  = 'ssh-key-ubuntu'
     }
 
     stages {
@@ -38,6 +39,7 @@ pipeline {
                 }
             }
         }
+
         stage('Setup Terraform') {
             steps {
                 sh '''#!/bin/bash
@@ -55,6 +57,7 @@ EOF
                 '''
             }
         }
+
         stage('Terraform Destroy') {
             steps {
                 sh '''
@@ -65,9 +68,28 @@ EOF
             }
         }
 
-        stage('Cleanup') {
+        stage('Cleanup Token') {
             steps {
                 sh 'rm -f yc_token.txt || true'
+            }
+        }
+
+        stage('Wipe K3s objects') {
+            steps {
+                sshagent(credentials: ["${SSH_CREDENTIALS_ID}"]) {
+                    sh '''
+                        export KUBECONFIG=/var/lib/jenkins/.kube/config
+
+                        echo "[INFO] Deleting all pods in all namespaces..."
+                        kubectl delete pod --all --all-namespaces --grace-period=0 --force
+
+                        echo "[INFO] Deleting all worker nodes (excluding master)..."
+                        for node in $(kubectl get nodes --no-headers | awk '$1 != "brasl-vkr-master" { print $1 }'); do
+                            echo "[INFO] Deleting node: $node"
+                            kubectl delete node $node || true
+                        done
+                    '''
+                }
             }
         }
     }
