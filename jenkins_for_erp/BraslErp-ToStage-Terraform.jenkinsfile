@@ -1,9 +1,9 @@
 pipeline {
     agent any
     environment {
-        YC_CLOUD_ID   = credentials('YC_CLOUD_ID')       // Jenkins Secret Text
-        YC_FOLDER_ID  = credentials('YC_FOLDER_ID')      // Jenkins Secret Text
-        SA_KEY_FILE   = credentials('yc-sa-key')         // Jenkins Secret File
+        YC_CLOUD_ID   = credentials('YC_CLOUD_ID')       
+        YC_FOLDER_ID  = credentials('YC_FOLDER_ID')      
+        SA_KEY_FILE   = credentials('yc-sa-key')         
         TF_CLI_CONFIG_FILE = "${WORKSPACE}/.terraformrc"
         
         TF_VAR_access_key = credentials('access_key')
